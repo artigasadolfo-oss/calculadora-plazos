@@ -213,11 +213,20 @@ body{font-family:var(--sans);background:var(--ink-50);color:var(--ink-900);font-
             </div>
             <div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:2px">
               <label class="ck"><input type="checkbox" id="urgente"> Actuación urgente (agosto corre)</label>
-              <label class="ck"><input type="checkbox" id="aclCk"> Hubo aclaración / complemento</label>
+              <label class="ck"><input type="checkbox" id="aclCk"> Se pidió aclaración / rectificación / subsanación / complemento</label>
             </div>
-            <div class="field hidden" id="aclBox" style="margin-top:12px">
-              <label for="acl">Notificación de la resolución de la aclaración (art. 215.5 LEC — nuevo dies a quo)</label>
-              <input type="date" id="acl">
+            <div class="hidden" id="aclBox" style="margin-top:12px">
+              <div class="row3">
+                <div class="field">
+                  <label for="acl">Notificación del auto/decreto que resuelve la aclaración</label>
+                  <input type="date" id="acl">
+                </div>
+                <div class="field">
+                  <label for="aclHora">Hora (opcional)</label>
+                  <input type="time" id="aclHora">
+                </div>
+              </div>
+              <div class="hint" style="margin-top:8px">El plazo para recurrir <b>se reinicia ÍNTEGRO</b> desde esta notificación: no se descuentan los días transcurridos hasta pedir la aclaración (art. 267.9 LOPJ «en todo caso, <b>comenzarán</b> a computarse»; art. 448.2 LEC; Auto de Pleno TS de 4 de octubre de 2011, queja 121/2011, que lee el «continuando el cómputo» del art. 215.5 LEC como «comenzando el cómputo»).</div>
             </div>
           </div>
         </div>
@@ -424,12 +433,29 @@ function calcular(){
     if(hh>15 || (hh===15&&mm>0)){ noti=sigHabil(addDays(notiOriginal,1),urgente); regla151=true; }
   }
 
-  let base=noti;
+  /* Aclaración / rectificación / subsanación / complemento (arts. 215.5 LEC, 267.9 LOPJ y 448.2 LEC).
+     El plazo NO se reanuda descontando lo consumido: se REINICIA íntegro desde el día siguiente a la
+     notificación del auto/decreto que resuelve la solicitud (Auto de Pleno TS 04/10/2011, queja 121/2011:
+     «continuando el cómputo» del art. 215.5 se lee como «comenzando el cómputo»). */
+  let base=noti, aclOriginal=null, regla151Acl=false;
   const aclV=$("aclCk").checked?$("acl").value:"";
-  if(aclV) base=mkDate(aclV);
+  if(aclV){
+    aclOriginal=mkDate(aclV);
+    base=aclOriginal;
+    const aclHoraV=$("aclHora").value;
+    if(aclHoraV){
+      const [hh,mm]=aclHoraV.split(":").map(Number);
+      if(hh>15 || (hh===15&&mm>0)){ base=sigHabil(addDays(aclOriginal,1),urgente); regla151Acl=true; }
+    }
+  }
 
   const naturales=(modo!=="habiles");
   let venc,gracia=null,computados=[];
+  /* Escenario restrictivo (3): si la solicitud de aclaración se reputase extemporánea o
+     manifiestamente improcedente, NO interrumpe y el plazo corre desde la resolución original.
+     Es la fecha que la REGLA DEL DESPACHO manda anotar en la cartera. */
+  let vencCorto=null;
+  if(aclV && !naturales && unidad==="d") vencCorto=computaDias(noti,n,urgente).venc;
   if(naturales){
     venc = unidad==="d" ? addDays(base,n) : fechaAFecha(base,n,unidad);
   } else if(unidad==="d"){
@@ -442,7 +468,7 @@ function calcular(){
 
   /* KPIs */
   $("kNoti").textContent=fmt(notiOriginal);
-  $("kNotiF").textContent=DIAS[wd(notiOriginal)]+(horaV?" · "+horaV:"")+(regla151?" → efectiva "+fmt(noti)+" (151.2)":"")+(aclV?" · dies a quo "+fmt(base):"");
+  $("kNotiF").textContent=DIAS[wd(notiOriginal)]+(horaV?" · "+horaV:"")+(regla151?" → efectiva "+fmt(noti)+" (151.2)":"")+(aclV?" · REINICIADO por aclaración · dies a quo "+fmt(addDays(base,1)):"");
   $("kPlazo").innerHTML=`${n}<small>${unidad==="d"?(naturales?"días nat.":"días háb."):unidad==="m"?"mes(es)":"año(s)"}</small>`;
   $("kPlazoF").textContent=(urgente?"urgente · ":"")+(modo==="sustantivo"?"fecha a fecha":modo==="naturales"?"naturales":"art. 130 LEC")+(pers?"":(TIPOS[tipo][4]?" · "+TIPOS[tipo][4]:""));
   $("kVenc").textContent=fmt(venc); $("kVencF").textContent=DIAS[wd(venc)];
@@ -458,6 +484,11 @@ function calcular(){
   /* Detalle */
   let det="";
   if(regla151) det+=dl("Notificación efectiva (art. 151.2)",fmt(noti)+" — recibida tras las 15:00","ocre");
+  if(aclV){
+    det+=dl("Resolución de la aclaración notificada",fmt(aclOriginal),"ocre");
+    if(regla151Acl) det+=dl("Aclaración — efectiva (art. 151.2)",fmt(base)+" — recibida tras las 15:00","ocre");
+    det+=dl("Efecto sobre el plazo","REINICIO íntegro ("+n+(unidad==="d"?" días":unidad==="m"?" mes(es)":" año(s)")+") — no se descuenta lo consumido","ocre");
+  }
   det+=dl("Dies a quo (cómputo desde)",fmt(addDays(base,1)));
   det+=dl("Régimen",modo==="habiles"?"Días hábiles (arts. 130 y 133 LEC)":modo==="naturales"?"Días naturales":"Sustantivo, fecha a fecha (art. 5 CC [verificar])");
   det+=dl("Sede / festivos locales",sede==="NINGUNA"?"— sin locales —":cap(sede));
@@ -467,6 +498,9 @@ function calcular(){
   /* Avisos */
   let av="";
   if(vencido) av+=aviso("brick","<b>PLAZO VENCIDO.</b> Verifique inmediatamente si cabe alguna actuación.");
+  if(aclV && aclOriginal<notiOriginal) av+=aviso("brick","<b>FECHAS INCOHERENTES:</b> la resolución de la aclaración ("+fmt(aclOriginal)+") es ANTERIOR a la notificación de la resolución aclarada ("+fmt(notiOriginal)+"). Revise las fechas: el cómputo mostrado no es fiable.");
+  if(aclV && aclOriginal>=notiOriginal) av+=aviso("ocre","<b>Plazo REINICIADO por la aclaración — escenario (1), el MÁS FAVORABLE.</b> Se computan los "+n+(unidad==="d"?" días":unidad==="m"?" mes(es)":" año(s)")+" ÍNTEGROS desde el día siguiente a la notificación de la resolución que resuelve la solicitud, <b>sin descontar</b> los días transcurridos hasta pedirla (art. 267.9 LOPJ: «en todo caso, <b>comenzarán</b> a computarse»; art. 448.2 LEC; ATS Pleno 04/10/2011, queja 121/2011 [ECLI:ES:TS:2011:10217A], seguido por STS 198/2018, de 10 de abril [ECLI:ES:TS:2018:1288] y STS 163/2019, de 14 de marzo [ECLI:ES:TS:2019:753]; en la provincia, SAP Alicante Secc. 8.ª 195/2014 [ECLI:ES:APA:2014:3192]).");
+  if(aclV && aclOriginal>=notiOriginal && vencCorto) av+=aviso("brick","<b>REGLA DEL DESPACHO — anote en la cartera la fecha CORTA: "+fmt(vencCorto)+".</b> Es el escenario (3): si la solicitud se presentó fuera de SU propio plazo (2 días aclaración/rectificación/subsanación, arts. 214.2 y 215.1 LEC; 5 días complemento, art. 215.2 LEC) o se reputa <b>manifiestamente improcedente o fraude procesal</b> (art. 247.2 LEC), NO interrumpe nada y el plazo corre desde la resolución ORIGINAL (STS 163/2019; STS 198/2018). El escenario (1) de arriba ("+fmt(venc)+") se <b>ARGUMENTA</b> si el órgano inadmite por extemporáneo o la contraria opone extemporaneidad — pero la fecha que se calendariza es la corta. Existe además un escenario (2) intermedio, la letra del art. 215.5 LEC («continuando el cómputo»), que descontaría los días ya corridos. <b>[revisar] — decisión del letrado.</b>");
   if(horaV && !regla151) av+=aviso("","Recibida a las "+horaV+" (antes de las 15:00): la notificación surte efecto el mismo día (art. 151.2 LEC).");
   if(naturales && (wd(venc)>=5 || FEST.has(iso(venc)))) av+=aviso("ocre","<b>[verificar]</b> El vencimiento natural cae en día inhábil: esta herramienta NO decide si procede prórroga (procesal 133.4 vs. civil 5 CC) — criterio del letrado.");
   if(!pers && NOTAS_TIPO[tipo]) av+=aviso("",NOTAS_TIPO[tipo]);
@@ -487,7 +521,7 @@ function calcular(){
   /* Resumen copiable */
   ultimoResumen=`CÓMPUTO DE PLAZO — ${new Date().toLocaleDateString("es-ES")}
 Notificación: ${fmt(notiOriginal)}${horaV?" a las "+horaV:""}${regla151?" → efectiva "+fmt(noti)+" (art. 151.2 LEC)":""}
-${aclV?"Aclaración resuelta y notificada: "+fmt(base)+" (art. 215.5 LEC)\n":""}Tipo: ${pers?"personalizado":TIPOS[tipo][3]+" ("+(TIPOS[tipo][4]||"")+")"}
+${aclV?"Aclaración/complemento: resolución notificada el "+fmt(aclOriginal)+(regla151Acl?" → efectiva "+fmt(base)+" (art. 151.2 LEC)":"")+"\n  (1) REINICIO (el más favorable, y lo que se calcula arriba): plazo ÍNTEGRO desde el día siguiente\n      — arts. 215.5 LEC, 267.9 LOPJ y 448.2 LEC; ATS Pleno 04/10/2011, queja 121/2011.\n"+(vencCorto?"  (3) SIN EFICACIA INTERRUPTIVA: si la solicitud fue extemporánea (2 días aclaración / 5 días\n      complemento) o manifiestamente improcedente (art. 247.2 LEC) → VENCIMIENTO "+fmt(vencCorto)+".\n  >> REGLA DEL DESPACHO: se CALENDARIZA la fecha corta ("+fmt(vencCorto)+"); el reinicio se ARGUMENTA.\n":"")+"":""}Tipo: ${pers?"personalizado":TIPOS[tipo][3]+" ("+(TIPOS[tipo][4]||"")+")"}
 Plazo: ${n}${unidad==="d"?(naturales?" días naturales":" días hábiles"):unidad==="m"?" mes(es)":" año(s)"}${urgente?" (URGENTE)":""}
 Sede del órgano: ${sede==="NINGUNA"?"sin festivos locales":cap(sede)}
 VENCIMIENTO: ${fmt(venc)} (${DIAS[wd(venc)]})
@@ -541,7 +575,7 @@ $("btnCopiar").addEventListener("click",()=>{
   navigator.clipboard.writeText(ultimoResumen).then(()=>toast("Cómputo copiado al portapapeles"));
 });
 $("btnLimpiar").addEventListener("click",()=>{
-  $("noti").value=""; $("hora").value=""; $("urgente").checked=false; $("aclCk").checked=false; $("acl").value="";
+  $("noti").value=""; $("hora").value=""; $("urgente").checked=false; $("aclCk").checked=false; $("acl").value=""; $("aclHora").value="";
   $("tipo").value="contestacion-ordinario"; $("sede").value="BENIDORM";
   $("persBox").classList.add("hidden"); $("aclBox").classList.add("hidden");
   sincronizaSidebar(); reset();
