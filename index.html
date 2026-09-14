@@ -75,6 +75,11 @@ body{font-family:var(--sans);background:var(--ink-50);color:var(--ink-900);font-
 .selwrap svg{position:absolute;right:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--ink-400);pointer-events:none}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .row3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:12px}
+/* Bloque de aclaración: las DOS fechas son el mismo dato y deben medir igual; la
+   hora sobraba de ancho y cede el resto. Las etiquetas reservan dos líneas y se
+   apoyan abajo, para que los tres inputs queden en la misma horizontal. */
+#aclBox .row3{grid-template-columns:1fr 1fr minmax(92px,.5fr);align-items:end}
+#aclBox .field label{font-size:10px;letter-spacing:.06em;line-height:1.35;min-height:2.7em;display:flex;align-items:flex-end}
 .ck{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink-600);cursor:pointer;min-height:24px}
 .ck input{width:16px;height:16px;accent-color:var(--grafito);cursor:pointer}
 .hint{font-size:11px;color:var(--ink-400);margin-top:5px}
@@ -139,6 +144,7 @@ body{font-family:var(--sans);background:var(--ink-50);color:var(--ink-900);font-
   .pr .btnp,.pr .ghost{white-space:normal}
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
   .cols,.row2,.row3{grid-template-columns:1fr !important}
+  #aclBox .field label{min-height:0;font-size:10.5px;letter-spacing:.12em;display:block}
   .calgrid{grid-template-columns:1fr !important}
   /* inputs date/time de iOS: evitar zoom automático (>16px) y altura consistente */
   .field input,.field select{font-size:16px;min-height:44px}
