@@ -218,7 +218,11 @@ body{font-family:var(--sans);background:var(--ink-50);color:var(--ink-900);font-
             <div class="hidden" id="aclBox" style="margin-top:12px">
               <div class="row3">
                 <div class="field">
-                  <label for="acl">Notificación del auto/decreto que resuelve la aclaración</label>
+                  <label for="aclPet">Presentación del escrito pidiendo la aclaración</label>
+                  <input type="date" id="aclPet">
+                </div>
+                <div class="field">
+                  <label for="acl">Notificación del auto/decreto que la resuelve</label>
                   <input type="date" id="acl">
                 </div>
                 <div class="field">
@@ -226,7 +230,7 @@ body{font-family:var(--sans);background:var(--ink-50);color:var(--ink-900);font-
                   <input type="time" id="aclHora">
                 </div>
               </div>
-              <div class="hint" style="margin-top:8px">El plazo para recurrir <b>se reinicia ÍNTEGRO</b> desde esta notificación: no se descuentan los días transcurridos hasta pedir la aclaración (art. 267.9 LOPJ «en todo caso, <b>comenzarán</b> a computarse»; art. 448.2 LEC; Auto de Pleno TS de 4 de octubre de 2011, queja 121/2011, que lee el «continuando el cómputo» del art. 215.5 LEC como «comenzando el cómputo»).</div>
+              <div class="hint" style="margin-top:8px"><b>Criterio del despacho — SUSPENSIÓN, no reinicio.</b> Se aplica la letra del art. 215.5 LEC («<b>continuando</b> el cómputo»): los días hábiles consumidos entre la notificación de la resolución y la presentación del escrito <b>se descuentan</b>, y al notificarse la aclaración solo queda el <b>resto</b>. Es el criterio conservador; el reinicio íntegro se ARGUMENTA si hace falta.</div>
             </div>
           </div>
         </div>
@@ -347,6 +351,14 @@ function computaDias(noti,n,urgente){
   while(contados<n){ d=addDays(d,1); if(!esInhabil(d,urgente)){ contados++; computados.push(iso(d)); } }
   return {venc:d, computados};
 }
+/* Días hábiles consumidos desde el dies a quo (día siguiente a `desde`) hasta `hasta` INCLUIDO.
+   Si `hasta` es inhábil, se cuentan los hábiles que hubo hasta él. Base del criterio de
+   SUSPENSIÓN del art. 215.5 LEC: lo que se gastó antes de pedir la aclaración. */
+function diasHabilesEntre(desde,hasta,urgente){
+  let d=new Date(desde), c=0;
+  while(d<hasta){ d=addDays(d,1); if(!esInhabil(d,urgente)) c++; }
+  return c;
+}
 function fechaAFecha(base,n,unidad){
   let y=base.getUTCFullYear(), m=base.getUTCMonth()+1, day=base.getUTCDate();
   if(unidad==="a") y+=n; else { const t=(m-1)+n; y+=Math.floor(t/12); m=t%12+1; }
@@ -434,11 +446,15 @@ function calcular(){
   }
 
   /* Aclaración / rectificación / subsanación / complemento (arts. 215.5 LEC, 267.9 LOPJ y 448.2 LEC).
-     El plazo NO se reanuda descontando lo consumido: se REINICIA íntegro desde el día siguiente a la
-     notificación del auto/decreto que resuelve la solicitud (Auto de Pleno TS 04/10/2011, queja 121/2011:
-     «continuando el cómputo» del art. 215.5 se lee como «comenzando el cómputo»). */
-  let base=noti, aclOriginal=null, regla151Acl=false;
+     CRITERIO DEL DESPACHO: SUSPENSIÓN (escenario 2), no reinicio. Se sigue la letra del
+     art. 215.5 LEC («CONTINUANDO el cómputo»): los días hábiles consumidos entre el dies a quo
+     de la resolución original y la presentación del escrito de aclaración se DESCUENTAN, y al
+     notificarse la resolución que la resuelve solo queda el RESTO del plazo.
+     El reinicio íntegro (escenario 1: ATS Pleno 04/10/2011, queja 121/2011) es MÁS FAVORABLE y
+     se ARGUMENTA; aquí se calendariza el conservador. */
+  let base=noti, aclOriginal=null, aclPeticion=null, regla151Acl=false;
   const aclV=$("aclCk").checked?$("acl").value:"";
+  const aclPetV=$("aclCk").checked?$("aclPet").value:"";
   if(aclV){
     aclOriginal=mkDate(aclV);
     base=aclOriginal;
@@ -448,18 +464,26 @@ function calcular(){
       if(hh>15 || (hh===15&&mm>0)){ base=sigHabil(addDays(aclOriginal,1),urgente); regla151Acl=true; }
     }
   }
+  if(aclPetV) aclPeticion=mkDate(aclPetV);
 
   const naturales=(modo!=="habiles");
   let venc,gracia=null,computados=[];
-  /* Escenario restrictivo (3): si la solicitud de aclaración se reputase extemporánea o
-     manifiestamente improcedente, NO interrumpe y el plazo corre desde la resolución original.
-     Es la fecha que la REGLA DEL DESPACHO manda anotar en la cartera. */
-  let vencCorto=null;
-  if(aclV && !naturales && unidad==="d") vencCorto=computaDias(noti,n,urgente).venc;
+  /* Días hábiles ya consumidos antes de pedir la aclaración y resto que queda.
+     Se cuentan los hábiles transcurridos desde el día siguiente a la notificación (dies a quo,
+     art. 133.1 LEC) hasta el día de presentación del escrito INCLUIDO: ese día el plazo ya
+     estaba corriendo y se gasta. */
+  let consumidos=null, restante=null, vencReinicio=null, suspension=false;
+  if(aclV && aclPeticion && !naturales && unidad==="d" && aclPeticion>=noti && aclOriginal>=aclPeticion){
+    consumidos=diasHabilesEntre(noti,aclPeticion,urgente);
+    restante=Math.max(0,n-consumidos);
+    suspension=true;
+    vencReinicio=computaDias(base,n,urgente).venc;   // escenario 1, para el aviso
+  }
+  const nEfectivo = suspension ? restante : n;
   if(naturales){
     venc = unidad==="d" ? addDays(base,n) : fechaAFecha(base,n,unidad);
   } else if(unidad==="d"){
-    const r=computaDias(base,n,urgente); venc=r.venc; computados=r.computados;
+    const r=computaDias(base,nEfectivo,urgente); venc=r.venc; computados=r.computados;
     gracia=sigHabil(addDays(venc,1),urgente);
   } else {
     venc=computaMesesAnios(base,n,unidad,urgente);
@@ -468,8 +492,8 @@ function calcular(){
 
   /* KPIs */
   $("kNoti").textContent=fmt(notiOriginal);
-  $("kNotiF").textContent=DIAS[wd(notiOriginal)]+(horaV?" · "+horaV:"")+(regla151?" → efectiva "+fmt(noti)+" (151.2)":"")+(aclV?" · REINICIADO por aclaración · dies a quo "+fmt(addDays(base,1)):"");
-  $("kPlazo").innerHTML=`${n}<small>${unidad==="d"?(naturales?"días nat.":"días háb."):unidad==="m"?"mes(es)":"año(s)"}</small>`;
+  $("kNotiF").textContent=DIAS[wd(notiOriginal)]+(horaV?" · "+horaV:"")+(regla151?" → efectiva "+fmt(noti)+" (151.2)":"")+(suspension?" · SUSPENDIDO por aclaración · quedan "+restante+" de "+n:(aclV?" · dies a quo "+fmt(addDays(base,1)):""));
+  $("kPlazo").innerHTML=`${suspension?restante:n}<small>${unidad==="d"?(naturales?"días nat.":"días háb."):unidad==="m"?"mes(es)":"año(s)"}${suspension?" (de "+n+")":""}</small>`;
   $("kPlazoF").textContent=(urgente?"urgente · ":"")+(modo==="sustantivo"?"fecha a fecha":modo==="naturales"?"naturales":"art. 130 LEC")+(pers?"":(TIPOS[tipo][4]?" · "+TIPOS[tipo][4]:""));
   $("kVenc").textContent=fmt(venc); $("kVencF").textContent=DIAS[wd(venc)];
   $("kVencG").textContent=gracia?("Gracia: hasta las 15:00 del "+fmt(gracia)+" (art. 135.5)"):"";
@@ -485,9 +509,13 @@ function calcular(){
   let det="";
   if(regla151) det+=dl("Notificación efectiva (art. 151.2)",fmt(noti)+" — recibida tras las 15:00","ocre");
   if(aclV){
+    if(aclPeticion) det+=dl("Escrito de aclaración presentado",fmt(aclPeticion),"ocre");
     det+=dl("Resolución de la aclaración notificada",fmt(aclOriginal),"ocre");
     if(regla151Acl) det+=dl("Aclaración — efectiva (art. 151.2)",fmt(base)+" — recibida tras las 15:00","ocre");
-    det+=dl("Efecto sobre el plazo","REINICIO íntegro ("+n+(unidad==="d"?" días":unidad==="m"?" mes(es)":" año(s)")+") — no se descuenta lo consumido","ocre");
+    if(suspension){
+      det+=dl("Días hábiles ya consumidos",consumidos+" de "+n+" (desde el dies a quo hasta la presentación, incluida)","ocre");
+      det+=dl("Efecto sobre el plazo","SUSPENSIÓN — quedan "+restante+" días hábiles (art. 215.5 LEC, «continuando el cómputo»)","ocre");
+    }
   }
   det+=dl("Dies a quo (cómputo desde)",fmt(addDays(base,1)));
   det+=dl("Régimen",modo==="habiles"?"Días hábiles (arts. 130 y 133 LEC)":modo==="naturales"?"Días naturales":"Sustantivo, fecha a fecha (art. 5 CC [verificar])");
@@ -499,8 +527,13 @@ function calcular(){
   let av="";
   if(vencido) av+=aviso("brick","<b>PLAZO VENCIDO.</b> Verifique inmediatamente si cabe alguna actuación.");
   if(aclV && aclOriginal<notiOriginal) av+=aviso("brick","<b>FECHAS INCOHERENTES:</b> la resolución de la aclaración ("+fmt(aclOriginal)+") es ANTERIOR a la notificación de la resolución aclarada ("+fmt(notiOriginal)+"). Revise las fechas: el cómputo mostrado no es fiable.");
-  if(aclV && aclOriginal>=notiOriginal) av+=aviso("ocre","<b>Plazo REINICIADO por la aclaración — escenario (1), el MÁS FAVORABLE.</b> Se computan los "+n+(unidad==="d"?" días":unidad==="m"?" mes(es)":" año(s)")+" ÍNTEGROS desde el día siguiente a la notificación de la resolución que resuelve la solicitud, <b>sin descontar</b> los días transcurridos hasta pedirla (art. 267.9 LOPJ: «en todo caso, <b>comenzarán</b> a computarse»; art. 448.2 LEC; ATS Pleno 04/10/2011, queja 121/2011 [ECLI:ES:TS:2011:10217A], seguido por STS 198/2018, de 10 de abril [ECLI:ES:TS:2018:1288] y STS 163/2019, de 14 de marzo [ECLI:ES:TS:2019:753]; en la provincia, SAP Alicante Secc. 8.ª 195/2014 [ECLI:ES:APA:2014:3192]).");
-  if(aclV && aclOriginal>=notiOriginal && vencCorto) av+=aviso("brick","<b>REGLA DEL DESPACHO — anote en la cartera la fecha CORTA: "+fmt(vencCorto)+".</b> Es el escenario (3): si la solicitud se presentó fuera de SU propio plazo (2 días aclaración/rectificación/subsanación, arts. 214.2 y 215.1 LEC; 5 días complemento, art. 215.2 LEC) o se reputa <b>manifiestamente improcedente o fraude procesal</b> (art. 247.2 LEC), NO interrumpe nada y el plazo corre desde la resolución ORIGINAL (STS 163/2019; STS 198/2018). El escenario (1) de arriba ("+fmt(venc)+") se <b>ARGUMENTA</b> si el órgano inadmite por extemporáneo o la contraria opone extemporaneidad — pero la fecha que se calendariza es la corta. Existe además un escenario (2) intermedio, la letra del art. 215.5 LEC («continuando el cómputo»), que descontaría los días ya corridos. <b>[revisar] — decisión del letrado.</b>");
+  if(aclV && aclPeticion && aclPeticion<notiOriginal) av+=aviso("brick","<b>FECHAS INCOHERENTES:</b> el escrito de aclaración ("+fmt(aclPeticion)+") se habría presentado ANTES de notificarse la resolución ("+fmt(notiOriginal)+"). Revise las fechas.");
+  if(aclV && aclPeticion && aclOriginal<aclPeticion) av+=aviso("brick","<b>FECHAS INCOHERENTES:</b> la aclaración se habría resuelto ("+fmt(aclOriginal)+") antes de pedirse ("+fmt(aclPeticion)+"). Revise las fechas.");
+  if(aclV && !aclPetV) av+=aviso("brick","<b>FALTA LA FECHA DE PRESENTACIÓN del escrito de aclaración.</b> Sin ella no pueden descontarse los días ya consumidos, y lo que se muestra es el <b>REINICIO ÍNTEGRO</b> — el escenario MÁS FAVORABLE, que NO es el criterio del despacho. Introdúzcala para obtener el cómputo conservador.");
+  if(suspension) av+=aviso("ocre","<b>Plazo SUSPENDIDO, no reiniciado — criterio conservador del despacho.</b> Se han descontado los <b>"+consumidos+"</b> días hábiles consumidos entre el dies a quo y la presentación del escrito (incluida), y desde la notificación de la aclaración quedan <b>"+restante+" de los "+n+"</b>. Es la letra del art. 215.5 LEC: «<b>continuando</b> el cómputo». <b>Se opta por este escenario por ser el menos favorable y, por tanto, garantía para el despacho.</b>");
+  if(suspension && vencReinicio && iso(vencReinicio)!==iso(venc)) av+=aviso("","<b>Escenario alternativo DEFENDIBLE — reinicio íntegro: "+fmt(vencReinicio)+".</b> El TS interpreta que el «continuando el cómputo» del art. 215.5 LEC debe leerse como «<b>comenzando</b> el cómputo», de modo que el plazo renacería completo ("+n+" días) sin descontar nada (art. 267.9 LOPJ: «en todo caso, comenzarán a computarse»; art. 448.2 LEC; ATS Pleno 04/10/2011, queja 121/2011 [ECLI:ES:TS:2011:10217A]; SSTS 198/2018 [ECLI:ES:TS:2018:1288] y 163/2019 [ECLI:ES:TS:2019:753]; en la provincia, SAP Alicante Secc. 8.ª 195/2014 [ECLI:ES:APA:2014:3192]). <b>No se calendariza, se ARGUMENTA</b> si el órgano inadmitiera por extemporáneo o la contraria opusiera extemporaneidad.");
+  if(suspension && restante===0) av+=aviso("brick","<b>PLAZO AGOTADO en el criterio conservador:</b> los "+n+" días ya estaban consumidos al presentar el escrito. Bajo este criterio no resta plazo alguno. La única vía sería sostener el <b>reinicio íntegro</b> (vencimiento "+(vencReinicio?fmt(vencReinicio):"—")+"). <b>[revisar] URGENTE — criterio del letrado.</b>");
+  if(aclV && suspension) av+=aviso("brick","<b>[revisar] La suspensión NI SIQUIERA opera</b> si la solicitud se presentó fuera de SU propio plazo (2 días aclaración/rectificación/subsanación, arts. 214.2 y 215.1 LEC; 5 días complemento, art. 215.2 LEC) o si se reputa <b>manifiestamente improcedente o fraude procesal</b> (art. 247.2 LEC): entonces NO interrumpe nada y el plazo habría seguido corriendo desde la resolución ORIGINAL, venciendo el <b>"+fmt(computaDias(noti,n,urgente).venc)+"</b> (STS 163/2019; STS 198/2018). Compruebe la tempestividad de la solicitud — la herramienta no puede hacerlo.");
   if(horaV && !regla151) av+=aviso("","Recibida a las "+horaV+" (antes de las 15:00): la notificación surte efecto el mismo día (art. 151.2 LEC).");
   if(naturales && (wd(venc)>=5 || FEST.has(iso(venc)))) av+=aviso("ocre","<b>[verificar]</b> El vencimiento natural cae en día inhábil: esta herramienta NO decide si procede prórroga (procesal 133.4 vs. civil 5 CC) — criterio del letrado.");
   if(!pers && NOTAS_TIPO[tipo]) av+=aviso("",NOTAS_TIPO[tipo]);
@@ -521,8 +554,8 @@ function calcular(){
   /* Resumen copiable */
   ultimoResumen=`CÓMPUTO DE PLAZO — ${new Date().toLocaleDateString("es-ES")}
 Notificación: ${fmt(notiOriginal)}${horaV?" a las "+horaV:""}${regla151?" → efectiva "+fmt(noti)+" (art. 151.2 LEC)":""}
-${aclV?"Aclaración/complemento: resolución notificada el "+fmt(aclOriginal)+(regla151Acl?" → efectiva "+fmt(base)+" (art. 151.2 LEC)":"")+"\n  (1) REINICIO (el más favorable, y lo que se calcula arriba): plazo ÍNTEGRO desde el día siguiente\n      — arts. 215.5 LEC, 267.9 LOPJ y 448.2 LEC; ATS Pleno 04/10/2011, queja 121/2011.\n"+(vencCorto?"  (3) SIN EFICACIA INTERRUPTIVA: si la solicitud fue extemporánea (2 días aclaración / 5 días\n      complemento) o manifiestamente improcedente (art. 247.2 LEC) → VENCIMIENTO "+fmt(vencCorto)+".\n  >> REGLA DEL DESPACHO: se CALENDARIZA la fecha corta ("+fmt(vencCorto)+"); el reinicio se ARGUMENTA.\n":"")+"":""}Tipo: ${pers?"personalizado":TIPOS[tipo][3]+" ("+(TIPOS[tipo][4]||"")+")"}
-Plazo: ${n}${unidad==="d"?(naturales?" días naturales":" días hábiles"):unidad==="m"?" mes(es)":" año(s)"}${urgente?" (URGENTE)":""}
+${aclV?"Aclaración/complemento:\n  Escrito presentado el: "+(aclPeticion?fmt(aclPeticion):"[FALTA ESTE DATO]")+"\n  Resolución notificada el: "+fmt(aclOriginal)+(regla151Acl?" → efectiva "+fmt(base)+" (art. 151.2 LEC)":"")+"\n"+(suspension?"  CRITERIO DEL DESPACHO — SUSPENSIÓN (art. 215.5 LEC, «continuando el cómputo»):\n    días hábiles consumidos antes de pedirla: "+consumidos+" de "+n+"\n    RESTAN "+restante+" días hábiles desde la notificación de la aclaración.\n    Se opta por este escenario por ser el MENOS FAVORABLE y garantía para el despacho.\n"+(vencReinicio&&iso(vencReinicio)!==iso(venc)?"  Alternativa DEFENDIBLE (no calendarizada) — reinicio íntegro: "+fmt(vencReinicio)+"\n    (art. 267.9 LOPJ; art. 448.2 LEC; ATS Pleno 04/10/2011, queja 121/2011;\n     SSTS 198/2018 y 163/2019). Se ARGUMENTA, no se anota.\n":"")+"  [revisar] No opera si la solicitud fue extemporánea (2 días aclaración / 5 días\n    complemento) o manifiestamente improcedente (art. 247.2 LEC).\n":"  AVISO: sin la fecha de presentación se muestra el REINICIO ÍNTEGRO,\n    que NO es el criterio del despacho.\n"):""}Tipo: ${pers?"personalizado":TIPOS[tipo][3]+" ("+(TIPOS[tipo][4]||"")+")"}
+Plazo: ${suspension?restante+" días hábiles restantes (de "+n+")":n+(unidad==="d"?(naturales?" días naturales":" días hábiles"):unidad==="m"?" mes(es)":" año(s)")}${urgente?" (URGENTE)":""}
 Sede del órgano: ${sede==="NINGUNA"?"sin festivos locales":cap(sede)}
 VENCIMIENTO: ${fmt(venc)} (${DIAS[wd(venc)]})
 ${gracia?"Presentable hasta las 15:00 del "+fmt(gracia)+" (art. 135.5 LEC)\n":""}[El cómputo definitivo es responsabilidad exclusiva y final del letrado]`;
@@ -575,7 +608,7 @@ $("btnCopiar").addEventListener("click",()=>{
   navigator.clipboard.writeText(ultimoResumen).then(()=>toast("Cómputo copiado al portapapeles"));
 });
 $("btnLimpiar").addEventListener("click",()=>{
-  $("noti").value=""; $("hora").value=""; $("urgente").checked=false; $("aclCk").checked=false; $("acl").value=""; $("aclHora").value="";
+  $("noti").value=""; $("hora").value=""; $("urgente").checked=false; $("aclCk").checked=false; $("acl").value=""; $("aclHora").value=""; $("aclPet").value="";
   $("tipo").value="contestacion-ordinario"; $("sede").value="BENIDORM";
   $("persBox").classList.add("hidden"); $("aclBox").classList.add("hidden");
   sincronizaSidebar(); reset();
