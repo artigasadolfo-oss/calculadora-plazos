@@ -5,7 +5,7 @@ Herramienta interna. Cómputo de plazos procesales civiles (LEC) con:
 - Reglas de los arts. 130, 133 y 135.5 LEC (día de gracia hasta las 15:00)
 - Agosto y 24-dic/6-ene inhábiles; modo urgente (agosto corre)
 - **Festivos locales según la sede del órgano judicial** (Benidorm por defecto;
-  Villajoyosa y Alicante destacadas; los 129 municipios de la provincia)
+  Villajoyosa y Alicante destacadas; las 13 sedes de partido judicial de la provincia, según el Censo Judicial; un municipio sin juzgado propio se computa con su sede: Altea → Benidorm, La Nucía → Villajoyosa)
 - Calendarios verificados contra el DOGV: Decreto 100/2025 (laboral CV 2026),
   Decreto 42/2026 (laboral CV 2027), Resolución 12/11/2025 (fiestas locales 2026)
 - Tipos de plazo predefinidos (contestación, recursos, ejecución, concursal)

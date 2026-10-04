@@ -170,7 +170,7 @@ body{font-family:var(--sans);background:var(--ink-50);color:var(--ink-900);font-
       <div class="navlink" data-grupo="Concursal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg><span>Concursal</span></div>
       <div class="navlink" data-grupo="__pers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Personalizado</span></div>
       <div class="nsec" style="margin-top:6px">Fuentes</div>
-      <div class="sideinfo">Festivos verificados contra DOGV: laboral CV 2026 y 2027 + fiestas locales 2026 (129 municipios de la provincia de Alicante).<br><br>Motor idéntico a computa_plazo.py (skill plazos-procesales). Paridad verificada 26/08/2026.</div>
+      <div class="sideinfo">Festivos verificados contra DOGV: laboral CV 2026 y 2027 + fiestas locales 2026 de las 13 sedes judiciales (partidos judiciales) de la provincia de Alicante. Elige la sede del órgano, no el municipio de la parte: Altea cuenta como Benidorm; La Nucía, como Villajoyosa.<br><br>Motor idéntico a computa_plazo.py (skill plazos-procesales). Paridad verificada 26/08/2026.</div>
     </div>
     <div class="user"><div class="av">AA</div><div><div class="un">Adolfo Artigas</div><div class="ur">Despacho</div></div></div>
   </aside>
@@ -272,7 +272,7 @@ body{font-family:var(--sans);background:var(--ink-50);color:var(--ink-900);font-
     </div>
 
     <div class="foot">
-      <b>Herramienta interna de Artigas Abogados.</b> Reglas: arts. 130, 133, 135.5 y 151.2 LEC; agosto y 24-dic/6-ene inhábiles salvo actuaciones urgentes; festivos locales de la sede del órgano. Calendarios verificados contra DOGV: Decreto 100/2025 (laboral CV 2026), Decreto 42/2026 (laboral CV 2027) y Resolución 12/11/2025 (fiestas locales 2026, 129 municipios). <b>El cómputo definitivo de un plazo es responsabilidad exclusiva y final del letrado.</b>
+      <b>Herramienta interna de Artigas Abogados.</b> Reglas: arts. 130, 133, 135.5 y 151.2 LEC; agosto y 24-dic/6-ene inhábiles salvo actuaciones urgentes; festivos locales de la sede del órgano. Calendarios verificados contra DOGV: Decreto 100/2025 (laboral CV 2026), Decreto 42/2026 (laboral CV 2027) y Resolución 12/11/2025 (fiestas locales 2026, sedes de los 13 partidos judiciales de la provincia, según el Censo Judicial). <b>El cómputo definitivo de un plazo es responsabilidad exclusiva y final del letrado.</b>
     </div>
   </main>
 </div>
@@ -383,7 +383,7 @@ function montaSedes(){
   for(const s of habituales){ const o=document.createElement("option"); o.value=s; o.textContent=cap(s); og1.appendChild(o); }
   sel.appendChild(og1);
   const resto=Object.keys(DATOS.locales).filter(s=>!habituales.includes(s)).sort((a,b)=>a.localeCompare(b,"es"));
-  const og2=document.createElement("optgroup"); og2.label="────── Resto de la provincia ──────";
+  const og2=document.createElement("optgroup"); og2.label="────── Resto de sedes judiciales ──────";
   for(const s of resto){ const o=document.createElement("option"); o.value=s; o.textContent=cap(s); og2.appendChild(o); }
   sel.appendChild(og2);
   const og3=document.createElement("optgroup"); og3.label="──────";
